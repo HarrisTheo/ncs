@@ -1,4 +1,162 @@
 {
   "version": 1,
-  "cases": []
+  "description": "Synthetic property-based evaluation cases for the fictional local policy corpus.",
+  "cases": [
+    {
+      "id": "auth_failed_attempts_benign",
+      "description": "A non-privileged employee entered an old password three times, then signed in successfully from their usual managed laptop. The employee confirmed the activity and no MFA, password, recovery, or session changes occurred.",
+      "tags": ["authentication", "benign", "negative-control"],
+      "expected": {
+        "category": "authentication_security",
+        "acceptable_severities": ["low"],
+        "required_policy_sources": ["authentication-security.md"],
+        "human_approval_required": false,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests whether ordinary failed attempts remain low severity instead of being inflated into compromise. No further action is necessary from the supplied facts."
+    },
+    {
+      "id": "auth_authorized_travel",
+      "description": "A sales employee signed in from a new country using their registered managed device during approved travel. The employee and manager confirmed the trip, authentication succeeded normally, and no credential or MFA settings changed.",
+      "tags": ["authentication", "benign", "context"],
+      "expected": {
+        "category": "authentication_security",
+        "acceptable_severities": ["low", "medium"],
+        "required_policy_sources": ["authentication-security.md"],
+        "human_approval_required": false,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests whether confirming benign context prevents an unusual location from being called unauthorized or malicious. Medium is tolerated because the policy has no explicit resolved-benign tier."
+    },
+    {
+      "id": "auth_unusual_signin_mfa_change_unconfirmed",
+      "description": "A standard user account signed in from a country not previously associated with the account, and a new MFA device was registered ten minutes later. The user has not yet been reached and authorization is unknown.",
+      "tags": ["authentication", "suspicious", "ambiguity"],
+      "expected": {
+        "category": "authentication_security",
+        "acceptable_severities": ["medium"],
+        "required_policy_sources": ["authentication-security.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests the distinction between suspicious and unauthorized. The report supports investigation but does not establish an unauthorized MFA change."
+    },
+    {
+      "id": "auth_password_spray_no_success",
+      "description": "Authentication logs show sustained password-spraying attempts against 35 employee accounts over twenty minutes. Every attempt failed, no session was created, and no privileged account was targeted.",
+      "tags": ["authentication", "suspicious", "password-spray"],
+      "expected": {
+        "category": "authentication_security",
+        "acceptable_severities": ["medium"],
+        "required_policy_sources": ["authentication-security.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests the explicit medium password-spraying rule and guards against inventing successful access."
+    },
+    {
+      "id": "account_compromise_confirmed_standard_user",
+      "description": "A standard employee denied a successful sign-in recorded under their account. A new mailbox forwarding rule and API token were created immediately afterward, and both remain active.",
+      "tags": ["account-compromise", "confirmed", "persistence"],
+      "expected": {
+        "category": "account_compromise",
+        "acceptable_severities": ["high"],
+        "required_policy_sources": ["account-compromise.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests user denial plus persistence indicators on a standard account and should trigger policy-grounded investigation or containment recommendations."
+    },
+    {
+      "id": "account_compromise_privileged_material_loss",
+      "description": "The infrastructure administrator confirmed they did not perform the recorded login. The intruder reset MFA, created a new privileged account, and deleted production backup indexes, causing confirmed material service impact.",
+      "tags": ["account-compromise", "privileged", "critical", "impact"],
+      "expected": {
+        "category": "account_compromise",
+        "acceptable_severities": ["critical"],
+        "required_policy_sources": ["account-compromise.md", "authentication-security.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests the explicit critical privileged-compromise rule, security-control change, persistence, and material impact without requiring invented facts."
+    },
+    {
+      "id": "data_download_destination_unknown",
+      "description": "A finance analyst downloaded 400 customer records outside their usual duties. The records contain contact information, but the business justification, destination, and whether the data left the approved environment are unknown.",
+      "tags": ["data-exfiltration", "download", "uncertainty"],
+      "expected": {
+        "category": "data_exfiltration",
+        "acceptable_severities": ["medium"],
+        "required_policy_sources": ["data-exfiltration.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests the policy distinction between unusual access or download and confirmed transfer or disclosure."
+    },
+    {
+      "id": "data_exfiltration_confirmed_external_disclosure",
+      "description": "A third party confirmed receiving an unauthorized export of 20,000 highly restricted customer identity records from the company environment. Audit logs confirm the external upload and the privacy lead confirmed serious legal impact.",
+      "tags": ["data-exfiltration", "confirmed", "critical", "external-disclosure"],
+      "expected": {
+        "category": "data_exfiltration",
+        "acceptable_severities": ["critical"],
+        "required_policy_sources": ["data-exfiltration.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests the critical rule with explicit external receipt, restricted data, scale, authorization status, and serious impact."
+    },
+    {
+      "id": "malware_blocked_before_execution",
+      "description": "Endpoint protection blocked a suspicious executable before it ran on one non-critical laptop. Review found no process creation, persistence, network connection, credential access, or matching activity on other hosts.",
+      "tags": ["malware", "blocked", "negative-control"],
+      "expected": {
+        "category": "malware",
+        "acceptable_severities": ["low"],
+        "required_policy_sources": ["malware-response.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests whether a malware alert is distinguished from execution while still permitting policy-supported evidence preservation."
+    },
+    {
+      "id": "malware_confirmed_persistence_c2",
+      "description": "Endpoint telemetry confirms an unknown binary executed on one employee workstation, installed a scheduled task for persistence, and repeatedly connected to suspected command-and-control infrastructure. No spread or destructive behavior is observed.",
+      "tags": ["malware", "execution", "persistence", "command-and-control"],
+      "expected": {
+        "category": "malware",
+        "acceptable_severities": ["high"],
+        "required_policy_sources": ["malware-response.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests the high-severity execution and persistence rule while guarding against an unsupported critical or widespread classification."
+    },
+    {
+      "id": "service_outage_checkout_no_workaround",
+      "description": "The customer checkout service has returned timeouts for all regions for 45 minutes following a deployment. Purchases cannot complete, the error rate remains elevated, and no reliable workaround is available.",
+      "tags": ["service-outage", "customer-impact", "deployment"],
+      "expected": {
+        "category": "service_outage",
+        "acceptable_severities": ["high"],
+        "required_policy_sources": ["service-outage.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": false
+      },
+      "notes": "Tests retrieval of operational rather than security guidance and the high-severity no-workaround condition without assuming a root cause."
+    },
+    {
+      "id": "ambiguous_laptop_popup_sparse_report",
+      "description": "A user says a strange pop-up appeared once on their laptop and then disappeared. No screenshot, alert, process information, network evidence, timing, or follow-up observations are available.",
+      "tags": ["malware", "ambiguous", "insufficient-information"],
+      "expected": {
+        "category": "malware",
+        "acceptable_severities": ["low", "medium"],
+        "required_policy_sources": ["malware-response.md"],
+        "human_approval_required": true,
+        "insufficient_information_expected": true
+      },
+      "notes": "Tests whether the system explicitly preserves uncertainty and avoids upgrading a sparse symptom into confirmed execution or infection."
+    }
+  ]
 }
