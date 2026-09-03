@@ -10,7 +10,7 @@ The application will recommend investigation or containment actions but will not
 
 ## Status
 
-The repository currently contains planning documents, the fictional policy corpus, and a tested TF-IDF policy retrieval layer. Prompts, Ollama inference, structured triage, review, evaluation, and the Streamlit workflow have not been implemented yet.
+The repository currently contains planning documents, the fictional policy corpus, a tested TF-IDF policy retrieval layer, structured Pydantic contracts, and the triage and reviewer system prompts. Ollama inference, triage orchestration, review orchestration, evaluation, and the Streamlit workflow have not been implemented yet.
 
 ## Intended stack
 
