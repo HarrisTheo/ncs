@@ -143,7 +143,9 @@ class ReviewerResult(_ContractModel):
 
     approved: StrictBool
     policy_grounded: StrictBool
-    evidence_grounded: StrictBool
+    evidence_grounded: StrictBool = Field(
+        description="Whether every factual claim anywhere in the assessment is grounded."
+    )
     human_approval_correct: StrictBool
     unsupported_claims: list[Statement] = Field(max_length=20)
     warnings: list[Statement] = Field(max_length=20)
@@ -159,8 +161,6 @@ class ReviewerResult(_ContractModel):
             raise ValueError("approved cannot be true when a grounding check failed")
         if self.approved and self.unsupported_claims:
             raise ValueError("approved cannot be true when unsupported claims exist")
-        if not self.approved and checks_pass and not (
-            self.unsupported_claims or self.warnings
-        ):
+        if not self.approved and not (self.unsupported_claims or self.warnings):
             raise ValueError("a rejected review must identify a concern")
         return self

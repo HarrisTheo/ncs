@@ -4,13 +4,13 @@ A small, local-first decision-support application for turning an incident narrat
 
 The intended workflow is:
 
-> Incident → retrieval → triage → verification → human decision
+> Incident → retrieval → triage → validation → reviewer → human decision
 
 The application will recommend investigation or containment actions but will not perform remediation. Every recommendation remains subject to an explicit human decision.
 
 ## Status
 
-The repository currently contains planning documents, the fictional policy corpus, TF-IDF retrieval, Pydantic contracts, system prompts, a local Ollama adapter, and a tested command-line triage path. Reviewer orchestration, evaluation, and the Streamlit workflow have not been implemented yet.
+The repository currently contains planning documents, the fictional policy corpus, TF-IDF retrieval, Pydantic contracts, system prompts, a local Ollama adapter, a tested command-line triage path, and advisory reviewer orchestration. Evaluation and the Streamlit workflow have not been implemented yet.
 
 ## Intended stack
 

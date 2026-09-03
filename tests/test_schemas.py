@@ -195,6 +195,15 @@ def test_rejected_review_must_explain_concern() -> None:
         ReviewerResult.model_validate(data)
 
 
+def test_failed_reviewer_check_must_explain_concern() -> None:
+    data = valid_reviewer_data()
+    data["approved"] = False
+    data["policy_grounded"] = False
+
+    with pytest.raises(ValidationError, match="must identify a concern"):
+        ReviewerResult.model_validate(data)
+
+
 def test_string_boolean_is_rejected() -> None:
     data = valid_reviewer_data()
     data["approved"] = "true"
