@@ -328,3 +328,55 @@ Action inspection:
 - Passing Pydantic and citation-membership checks did not prevent policy nuance from being misstated. This validates the need for the later reviewer stage and visible human inspection.
 
 The manual test succeeded technically, but the above quality issues are intentionally retained in this record rather than treating schema validity as correctness.
+
+## 2026-09-03 — Minimal Streamlit UI
+
+### Files changed
+
+- `app.py`: implemented the thin Streamlit presentation layer.
+- `tests/test_app.py`: added Streamlit component tests for initial rendering and
+  empty-input handling.
+- `README.md`: added the local Streamlit launch command and current status.
+- `planning/04_agent_journal.md`: recorded the UI implementation and smoke test.
+
+### Interface decisions
+
+- The page contains one incident text area and one `Analyze` button.
+- The notice “Demonstration system using fictional policies. AI recommendations
+  require human judgement.” is visible before and after analysis.
+- `app.py` delegates the complete backend operation to `triage_and_review()`;
+  it contains presentation and session-state handling, not retrieval, prompt,
+  validation, or model orchestration logic.
+- Results show category, severity, categorical confidence, concise summary,
+  exact evidence, retrieved documents and TF-IDF scores, expandable cited policy
+  text, policy-supported actions, reviewer checks, unsupported claims, warnings,
+  and the human-approval requirement.
+- Reviewer rejection is displayed as a separate error state while preserving the
+  original assessment unchanged.
+- Low confidence produces an explicit insufficient-evidence warning.
+- Empty input, invalid/insufficient input, retrieval failure, Ollama
+  unavailability, timeout, configuration problems, malformed or ungrounded model
+  output, and unexpected local failures map to concise user-facing messages.
+- No custom CSS, HTML rendering, policy upload, remediation control, or other UI
+  infrastructure was added.
+
+### Environment and dependency
+
+- Streamlit was declared in `requirements.txt` but was not installed in the
+  project virtual environment.
+- Installed `streamlit==1.63.0` and its dependencies into `.venv`; no system-wide
+  package installation was performed.
+
+### Verification
+
+- Full automated suite: **88 passed**.
+- Streamlit started on the loopback-only address `127.0.0.1:8501`.
+- `/_stcore/health` returned `ok`.
+- A browser smoke test confirmed the title, explanation, fictional-policy notice,
+  text area, Analyze button, progress indicator, all result sections, policy
+  expanders, recommendation support, reviewer rejection state, reviewer warning,
+  and human-approval notice.
+- The end-to-end smoke test used the synthetic administrator/MFA/4,000-record
+  incident with local `qwen3.5:9b`. The reviewer rejected the triage and the UI
+  displayed that disagreement without replacing the assessment.
+- The temporary Streamlit server was stopped after verification.

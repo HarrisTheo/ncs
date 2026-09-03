@@ -10,7 +10,7 @@ The application will recommend investigation or containment actions but will not
 
 ## Status
 
-The repository currently contains planning documents, the fictional policy corpus, TF-IDF retrieval, Pydantic contracts, system prompts, a local Ollama adapter, a tested command-line triage path, and advisory reviewer orchestration. Evaluation and the Streamlit workflow have not been implemented yet.
+The repository currently contains planning documents, the fictional policy corpus, TF-IDF retrieval, Pydantic contracts, system prompts, a local Ollama adapter, a tested command-line triage path, advisory reviewer orchestration, and a minimal Streamlit interface. The evaluation harness has not been implemented yet.
 
 ## Intended stack
 
@@ -53,6 +53,19 @@ python -m src.triage "Describe the incident here"
 ```
 
 The command prints the ranked retrieval matches, every policy passage supplied to the model, and the validated `IncidentAssessment` as JSON. It fails visibly on invalid input, missing policy context, unavailable inference, malformed model output, or a fabricated structured policy reference.
+
+## Streamlit UI
+
+With Ollama running and the virtual environment active:
+
+```bash
+export OLLAMA_MODEL=qwen3.5:9b
+streamlit run app.py
+```
+
+The UI runs the complete local triage and reviewer flow. It displays the model
+proposal and reviewer findings separately; it does not perform remediation or
+turn reviewer approval into an operational decision.
 
 ## Repository layout
 
