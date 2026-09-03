@@ -78,11 +78,7 @@ def triage_incident(
             "No relevant local policy context was found; triage was not run."
         )
 
-    context_sections = [
-        section
-        for match in matches
-        for section in match.sections
-    ]
+    context_sections = [section for match in matches for section in match.sections]
     if not context_sections:
         raise NoPolicyContextError(
             "Retrieved policy sources could not be loaded; triage was not run."
@@ -135,9 +131,8 @@ def _validate_assessment_grounding(
     incident: IncidentInput,
     context_sections: Sequence[PolicySection],
 ) -> None:
-    sections_by_key = {
-        (section.source, section.section_id): section
-        for section in context_sections
+    available_references = {
+        (section.source, section.section_id) for section in context_sections
     }
     sections_by_id = {
         section.section_id: section
@@ -146,7 +141,8 @@ def _validate_assessment_grounding(
     invalid_references = [
         f"{reference.source_filename}:{reference.section_id}"
         for reference in assessment.relevant_policies
-        if (reference.source_filename, reference.section_id) not in sections_by_key
+        if (reference.source_filename, reference.section_id)
+        not in available_references
     ]
     if invalid_references:
         raise UngroundedAssessmentError(
@@ -154,11 +150,11 @@ def _validate_assessment_grounding(
             + ", ".join(invalid_references)
         )
 
+    normalised_incident = _normalise_for_match(incident.description)
     unsupported_evidence = [
         evidence.observation
         for evidence in assessment.evidence
-        if _normalise_for_match(evidence.observation)
-        not in _normalise_for_match(incident.description)
+        if _normalise_for_match(evidence.observation) not in normalised_incident
     ]
     if unsupported_evidence:
         raise UngroundedAssessmentError(
@@ -178,12 +174,16 @@ def _validate_assessment_grounding(
             + ", ".join(invalid_action_references)
         )
 
+    normalised_sections = {
+        section_id: _normalise_for_match(section.text)
+        for section_id, section in sections_by_id.items()
+    }
     unsupported_actions = [
         action.action
         for action in assessment.recommended_actions
         if not any(
             _normalise_for_match(action.action)
-            in _normalise_for_match(sections_by_id[section_id].text)
+            in normalised_sections[section_id]
             for section_id in action.policy_section_ids
         )
     ]

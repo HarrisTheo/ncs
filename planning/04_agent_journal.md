@@ -380,3 +380,27 @@ The manual test succeeded technically, but the above quality issues are intentio
   incident with local `qwen3.5:9b`. The reviewer rejected the triage and the UI
   displayed that disagreement without replacing the assessment.
 - The temporary Streamlit server was stopped after verification.
+
+## 2026-09-03 — Maintainability review
+
+The feature-complete codebase was reviewed for dead code, duplication,
+unnecessary dependencies and abstractions, long functions, naming, coupling,
+hidden configuration, and avoidable complexity. No large refactor or dependency
+change was justified for this small MVP.
+
+Small behavior-preserving cleanups were made:
+
+- Removed a redundant assessment-level approval check because
+  `RecommendedAction.human_approval_required` is already constrained to the
+  literal value `True` by Pydantic.
+- Simplified policy-section flattening and renamed the citation membership set
+  to describe what it contains.
+- Normalized the incident and retrieved policy sections once per grounding
+  validation instead of repeatedly inside comprehensions.
+- Calculated the evaluation retrieval-hit count once before formatting it.
+
+The existing provider protocol, immutable run records, error hierarchy,
+retrieval result types, and UI/backend separation were retained because each has
+a concrete use and keeps boundaries testable.
+
+Verification: the full automated suite passed with **90 tests**.

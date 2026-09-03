@@ -122,9 +122,6 @@ class IncidentAssessment(_ContractModel):
         if len(section_ids) != len(set(section_ids)):
             raise ValueError("relevant policy section IDs must be unique")
 
-        if any(not action.human_approval_required for action in self.recommended_actions):
-            raise ValueError("every recommended action requires human approval")
-
         for action in self.recommended_actions:
             if len(action.policy_section_ids) != len(set(action.policy_section_ids)):
                 raise ValueError("action policy section IDs must be unique")

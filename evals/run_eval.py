@@ -155,6 +155,7 @@ def evaluate_case(
 
 def print_report(outcomes: Sequence[CaseOutcome], *, model: str) -> None:
     total = len(outcomes)
+    retrieval_hits = sum(outcome.retrieval_hit for outcome in outcomes)
     triage_successes = [outcome for outcome in outcomes if outcome.triage_success]
     structured_successes = [
         outcome
@@ -187,8 +188,7 @@ def print_report(outcomes: Sequence[CaseOutcome], *, model: str) -> None:
     )
     print(
         "Policy retrieval hit rate: "
-        f"{sum(outcome.retrieval_hit for outcome in outcomes)}/{total} "
-        f"({_percentage(sum(outcome.retrieval_hit for outcome in outcomes), total)})"
+        f"{retrieval_hits}/{total} ({_percentage(retrieval_hits, total)})"
     )
     print(
         "Human-approval compliance: "
