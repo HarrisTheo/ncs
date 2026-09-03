@@ -61,3 +61,30 @@ Environment details are recorded descriptively. Project configuration contains n
 - The policy directory contains only a format note, not invented organizational policy content.
 - JSON evaluation fixtures start with an empty, versioned case collection.
 - The Ollama host example uses loopback and the model value is intentionally blank.
+
+## 2026-09-03 — Fictional policy knowledge base
+
+### Files created
+
+- `data/policies/authentication-security.md`
+- `data/policies/account-compromise.md`
+- `data/policies/data-exfiltration.md`
+- `data/policies/malware-response.md`
+- `data/policies/service-outage.md`
+
+### Files updated
+
+- `data/policies/README.md`
+- `planning/04_agent_journal.md`
+
+### Assumptions and decisions
+
+- The knowledge base is demonstration content only. Every policy contains an explicit fictional-policy notice and makes no claim about a real organization.
+- The five documents use a shared `Low`, `Medium`, `High`, and `Critical` severity vocabulary while retaining incident-specific criteria.
+- Each document contains purpose, indicators, severity guidance, recommended actions, and human approval requirements under consistent Markdown headings.
+- Documents intentionally contain some cross-domain terms, such as suspicious authentication followed by data access, so later retrieval and grounded multi-policy reasoning can be demonstrated.
+- Guidance distinguishes suspicion from confirmation and, for data incidents, distinguishes access, download, transfer, and confirmed disclosure.
+- Every recommended action remains subject to a recorded human disposition in the application. Actions that change accounts, sessions, endpoints, services, data flows, or external communications explicitly require authorized human approval.
+- No policy action is executable by the copilot.
+- File names and headings are designed to support deterministic passage identifiers and citations later; explicit citation IDs were not added to keep the documents readable.
+- No LLM, retrieval logic, or application behavior was implemented in this step.
