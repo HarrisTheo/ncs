@@ -10,7 +10,7 @@ def valid_assessment_data() -> dict:
     return {
         "category": "data_exfiltration",
         "severity": "high",
-        "confidence": 0.82,
+        "confidence": "high",
         "evidence": [
             {
                 "observation": "Approximately 4,000 customer records were downloaded.",
@@ -25,14 +25,12 @@ def valid_assessment_data() -> dict:
             {
                 "source_filename": "data-exfiltration.md",
                 "section_id": "data-exfiltration#severity-guidance",
-                "relevance": "The policy treats an unexplained export of at least "
-                "1,000 customer records as high severity.",
             }
         ],
         "recommended_actions": [
             {
                 "action": "Review export and outbound-transfer audit records.",
-                "rationale": "This can distinguish download from confirmed transfer.",
+                "policy_section_ids": ["data-exfiltration#recommended-actions"],
                 "human_approval_required": True,
             }
         ],
@@ -55,7 +53,7 @@ def test_valid_incident_assessment_is_accepted() -> None:
     assessment = IncidentAssessment.model_validate(valid_assessment_data())
 
     assert assessment.severity == "high"
-    assert assessment.confidence == 0.82
+    assert assessment.confidence == "high"
     assert assessment.relevant_policies[0].source_filename == "data-exfiltration.md"
 
 
@@ -68,7 +66,7 @@ def test_invalid_severity_is_rejected(severity: object) -> None:
         IncidentAssessment.model_validate(data)
 
 
-@pytest.mark.parametrize("confidence", [-0.01, 1.01, float("nan"), float("inf"), "0.8"])
+@pytest.mark.parametrize("confidence", [-0.01, 0.8, "very_high", "HIGH", None])
 def test_invalid_confidence_is_rejected(confidence: object) -> None:
     data = valid_assessment_data()
     data["confidence"] = confidence
@@ -91,6 +89,14 @@ def test_invalid_reasoning_summary_is_rejected(summary: str) -> None:
     data["reasoning_summary"] = summary
 
     with pytest.raises(ValidationError):
+        IncidentAssessment.model_validate(data)
+
+
+def test_truncated_reasoning_summary_is_rejected() -> None:
+    data = valid_assessment_data()
+    data["reasoning_summary"] = "The explanation ends in the middle of a sentence"
+
+    with pytest.raises(ValidationError, match="terminal punctuation"):
         IncidentAssessment.model_validate(data)
 
 
@@ -122,7 +128,24 @@ def test_action_without_human_approval_is_rejected() -> None:
     data = valid_assessment_data()
     data["recommended_actions"][0]["human_approval_required"] = False
 
-    with pytest.raises(ValidationError, match="every recommended action"):
+    with pytest.raises(ValidationError, match="Input should be True"):
+        IncidentAssessment.model_validate(data)
+
+
+def test_action_without_policy_support_is_rejected() -> None:
+    data = valid_assessment_data()
+    data["recommended_actions"][0]["policy_section_ids"] = []
+
+    with pytest.raises(ValidationError):
+        IncidentAssessment.model_validate(data)
+
+
+def test_duplicate_action_policy_references_are_rejected() -> None:
+    data = valid_assessment_data()
+    section_id = data["recommended_actions"][0]["policy_section_ids"][0]
+    data["recommended_actions"][0]["policy_section_ids"].append(section_id)
+
+    with pytest.raises(ValidationError, match="action policy section IDs must be unique"):
         IncidentAssessment.model_validate(data)
 
 

@@ -85,8 +85,9 @@ The UI accepts no policy upload, arbitrary path, rich HTML, or operational crede
 - Read `.md` files from one fixed project policy directory.
 - Split each document by headings.
 - Generate passage identifiers deterministically from the file name and heading, adding a suffix for duplicate headings.
-- Build an in-memory TF-IDF matrix and rank passages with cosine similarity.
-- Return the top three passages with identifier, title, heading, text, and score.
+- Build an in-memory TF-IDF matrix and rank complete documents with cosine similarity.
+- Return at most three documents scoring at least 25% of the best document score,
+  retaining every section from each selected document for grounded context.
 - Stop with a visible error if the corpus cannot be loaded or every similarity score is zero.
 
 The index is rebuilt on application startup or Streamlit cache invalidation. There is no file watcher, persisted index, custom indexing job, score-tuning UI, or retrieval service.
@@ -95,7 +96,7 @@ Policy metadata should use a tiny documented convention that can be parsed witho
 
 ### Triage LLM call
 
-- Receive the validated incident, the top retrieved passages, concise instructions, and the Pydantic-generated JSON schema.
+- Receive the validated incident, all sections of the selected documents, concise instructions, and the Pydantic-generated JSON schema.
 - Return observed facts, inferences, unknowns, category, possible impact, proposed severity, confidence, citations, investigation questions, recommendations, and limitations.
 - Use only passage identifiers present in the prompt.
 
@@ -106,7 +107,9 @@ This is one Ollama call. It has no tools and cannot load files or execute action
 - Parse the response with Pydantic.
 - Enforce enumerations, required fields, bounds, and basic cross-field invariants.
 - Reject citations that do not resolve to one of the retrieved passages.
-- Require rationale and a citation for policy-based recommendations.
+- Require evidence to be an exact excerpt of the incident description.
+- Require each recommendation to be an exact excerpt of a cited policy action section.
+- Resolve validated policy identifiers to exact source text deterministically rather than asking the model to reproduce quotations.
 - Require a human disposition for every recommendation, regardless of its apparent impact.
 - Return a short list of blocking errors and non-blocking warnings.
 
@@ -158,8 +161,8 @@ Verification errors can be ordinary typed Python values; they do not require an 
 
 1. The user submits an incident description.
 2. Pydantic rejects empty or oversized input before inference.
-3. The retriever loads and chunks the fixed Markdown corpus, builds TF-IDF vectors, and returns the top three passages.
-4. The UI retains and displays exactly those passages.
+3. The retriever loads the fixed Markdown corpus, ranks complete documents with TF-IDF, and returns up to three relevant documents.
+4. The UI retains and displays every section from exactly those documents.
 5. One Ollama call produces the proposed `TriageResult`.
 6. Pydantic and deterministic verification accept it or stop with visible errors. There is no automatic repair call.
 7. A valid result is sent through the same Ollama client for the structured reviewer pass.
@@ -178,7 +181,11 @@ The pipeline is sequential and synchronous. Async execution, queues, jobs, callb
 
 Use **TF-IDF with cosine similarity** in process through scikit-learn. For five documents, the dependency is a larger cost than the computation, but it avoids writing a custom ranker and gives a more credible retrieval demonstration than exact keyword counts. No embeddings or vector database are used.
 
-The top-k value is fixed at three for the MVP. A zero-score result is treated as ungrounded rather than tuned through an arbitrary relevance threshold. Retrieval tests, not architectural speculation, decide whether TF-IDF is adequate.
+The result limit is three documents. A document must score at least 25% of the
+best document score; this small relative floor prevents weak documents from
+being added merely to fill the limit. A zero best score is treated as
+ungrounded. The threshold is an empirically tested heuristic for this five-file
+demonstration corpus, not a calibrated relevance probability.
 
 ## Minimal project structure
 
@@ -236,7 +243,7 @@ The JSON brief can contain sensitive information. Download is explicit, and the 
 | Empty or oversized incident | Reject before retrieval |
 | Missing, unreadable, or malformed policy corpus | Stop and name the affected file |
 | All retrieval scores are zero | Stop or clearly label the run ungrounded; do not call the triage grounded |
-| Relevant passage is ranked outside the top three | Expose results and catch representative misses in retrieval tests |
+| Relevant document is ranked outside the top three or relative floor | Expose results and catch representative misses in retrieval tests |
 | Triage output is malformed | Show validation errors; do not automatically repair or continue |
 | Citation is invented | Reject the triage result |
 | A plausible claim is unsupported | Rely on visible evidence, reviewer findings, and human judgment; schema validity is not truth |

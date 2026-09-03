@@ -140,9 +140,13 @@ class OllamaLLM:
         try:
             return response_model.model_validate_json(content)
         except ValidationError as exc:
+            details = "; ".join(
+                f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+                for error in exc.errors(include_url=False, include_input=False)
+            )
             raise LLMMalformedResponseError(
                 f"Ollama returned data that does not match "
-                f"{response_model.__name__}."
+                f"{response_model.__name__}: {details}"
             ) from exc
 
 

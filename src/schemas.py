@@ -14,6 +14,7 @@ from pydantic import (
     Field,
     StrictBool,
     StringConstraints,
+    field_validator,
     model_validator,
 )
 
@@ -36,6 +37,10 @@ ShortSummary = Annotated[
     str,
     StringConstraints(strip_whitespace=True, min_length=1, max_length=600),
 ]
+IncidentDescription = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=20, max_length=5_000),
+]
 PolicyFilename = Annotated[
     str,
     StringConstraints(
@@ -52,14 +57,17 @@ SectionId = Annotated[
         max_length=160,
     ),
 ]
-Confidence = Annotated[
-    float,
-    Field(strict=True, ge=0.0, le=1.0, allow_inf_nan=False),
-]
+Confidence = Literal["low", "medium", "high"]
 
 
 class _ContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+
+class IncidentInput(_ContractModel):
+    """Validated incident text accepted by the triage pipeline."""
+
+    description: IncidentDescription
 
 
 class EvidenceItem(_ContractModel):
@@ -74,15 +82,14 @@ class PolicyReference(_ContractModel):
 
     source_filename: PolicyFilename
     section_id: SectionId
-    relevance: Statement
 
 
 class RecommendedAction(_ContractModel):
     """A recommendation for a human to consider, never an executable action."""
 
     action: Statement
-    rationale: Statement
-    human_approval_required: StrictBool
+    policy_section_ids: list[SectionId] = Field(min_length=1, max_length=5)
+    human_approval_required: Literal[True]
 
 
 class IncidentAssessment(_ContractModel):
@@ -102,6 +109,13 @@ class IncidentAssessment(_ContractModel):
     recommended_actions: list[RecommendedAction] = Field(max_length=10)
     human_approval_required: StrictBool
 
+    @field_validator("reasoning_summary")
+    @classmethod
+    def validate_complete_summary(cls, summary: str) -> str:
+        if summary[-1] not in ".!?":
+            raise ValueError("reasoning_summary must end with terminal punctuation")
+        return summary
+
     @model_validator(mode="after")
     def validate_grounding_and_approval(self) -> Self:
         section_ids = [reference.section_id for reference in self.relevant_policies]
@@ -110,6 +124,10 @@ class IncidentAssessment(_ContractModel):
 
         if any(not action.human_approval_required for action in self.recommended_actions):
             raise ValueError("every recommended action requires human approval")
+
+        for action in self.recommended_actions:
+            if len(action.policy_section_ids) != len(set(action.policy_section_ids)):
+                raise ValueError("action policy section IDs must be unique")
 
         expected_approval = bool(self.recommended_actions)
         if self.human_approval_required is not expected_approval:

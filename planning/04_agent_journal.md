@@ -232,3 +232,99 @@ Covered scenarios:
 - Provider unit suite: **27 passed**. These tests use a mock client and make no inference or network calls.
 - Full project suite before final documentation verification: **62 passed**.
 - Covered model configuration, precedence, loopback enforcement, client construction, deterministic request options, schema passing, connection failure, provider failure, timeout, missing response content, malformed JSON, Pydantic mismatch, non-echoing errors, and the replaceable protocol surface.
+
+## 2026-09-03 — Grounded triage path
+
+### Files changed
+
+- `src/schemas.py`: added bounded `IncidentInput` validation.
+- `src/triage.py`: implemented UI-independent triage orchestration and a command-line entry point.
+- `tests/test_triage.py`: added deterministic pipeline tests with stub model providers.
+- `README.md`: documented the implemented triage status and manual command.
+- `planning/04_agent_journal.md`: recorded this implementation and real-model inspection.
+
+### Implemented flow
+
+The implemented flow is:
+
+> incident → Pydantic input validation → TF-IDF retrieval → deterministic policy-context expansion → local structured Ollama inference → Pydantic parsing and validation → citation-membership verification → `IncidentAssessment`
+
+Important decisions:
+
+- Incident descriptions must contain 20 to 5,000 non-whitespace characters.
+- Retrieval keeps the existing deterministic top-three section matches and their cosine scores.
+- A retrieval probe showed that top sections correctly identify the incident domains but can omit the same documents' recommended-action sections. The context builder therefore expands only the documents represented in the ranked top-three matches and supplies all of their sections to the model.
+- Ranked matches and expanded context passages are retained separately in `TriageRun`, so a caller can inspect both what matched and exactly what the model saw.
+- Model input is JSON-delimited and includes exact source filenames and section identifiers.
+- Every structured policy reference in the assessment is checked against the passages actually supplied to the model. An unknown filename or section ID rejects the assessment.
+- Invalid incident input or missing retrieval context stops before inference. There is no synthetic fallback assessment.
+- Provider and malformed-response errors remain visible and are not converted into plausible-looking results.
+- The command-line entry point prints an auditable JSON artifact and returns a non-zero status with a concise error on failure.
+- The reviewer and Streamlit UI remain unimplemented.
+
+### Deterministic tests
+
+The new tests cover:
+
+- Successful grounded orchestration with traceable sources.
+- Expansion of matched documents to include recommended actions and human approval requirements.
+- Empty, too-short, and oversized incident rejection before inference.
+- Empty policy directory failure without a fallback result.
+- Rejection of a fabricated structured policy citation.
+- Propagation of malformed model-response failure.
+- Explicit low-confidence handling of insufficient information.
+- Exact source identifiers in the JSON-delimited model context.
+
+Schema and triage focused tests: **35 passed** before the manual inference run.
+
+### Manual local-model test
+
+Input:
+
+> An administrator account logged in from an unusual location, MFA was reset, and approximately 4,000 customer records were downloaded.
+
+Model: `qwen3.5:9b`, with thinking disabled and structured output validated as `IncidentAssessment`.
+
+Ranked retrieval matches:
+
+1. `data-exfiltration#severity-guidance` from `data-exfiltration.md`, score `0.1405`.
+2. `authentication-security#indicators` from `authentication-security.md`, score `0.1369`.
+3. `authentication-security#human-approval-requirements` from `authentication-security.md`, score `0.0889`.
+
+The grounded context contained all five sections from `data-exfiltration.md` and all five sections from `authentication-security.md`. It did not contain `account-compromise.md`.
+
+Validated model assessment:
+
+- Category: `data_exfiltration`.
+- Severity: `high`.
+- Confidence: `0.9`.
+- Evidence: unusual administrator login, MFA reset, and download of approximately 4,000 customer records.
+- Policies cited: data-exfiltration severity and indicators; authentication-security severity.
+- Recommendations: preserve access/export/transfer audit evidence, and recommend session revocation or temporary access restriction when unauthorized access remains plausible.
+- Every recommendation and the top-level assessment required human approval.
+- All structured policy citations resolved to passages supplied to the model.
+
+### Manual grounding inspection
+
+Evidence inspection:
+
+- The unusual administrator login is directly supported by the input.
+- The download of approximately 4,000 customer records is directly supported by the input.
+- “MFA was reset for the administrator account” is a reasonable grammatical interpretation, but the input does not explicitly state whose MFA was reset. It should be treated as a small overstatement in an evidence field.
+
+Action inspection:
+
+- Preserving audit records is directly supported by `data-exfiltration#recommended-actions`.
+- Recommending session revocation or temporary access restriction when active unauthorized access is plausible is directly supported by `authentication-security#recommended-actions`.
+- Both actions were present in the actual model context and were correctly marked as requiring human approval.
+
+### Problems discovered
+
+- Confidence `0.9` is too high. The input does not confirm that the unusual location or MFA reset was unauthorized, that the download lacked business justification, or that data was transferred externally.
+- The reasoning summary says that downloading 1,000 or more customer records constitutes high severity. The policy is narrower: it refers to an **unexplained export** of at least 1,000 records. Dropping “unexplained” overstates the rule.
+- The `data_exfiltration` category is reasonable as a triage category, but the input establishes download rather than confirmed external disclosure. The current category vocabulary does not distinguish suspected from confirmed exfiltration.
+- `account-compromise.md` is relevant to the combined unusual login and MFA reset but was outside the top-three section matches, demonstrating section-level TF-IDF's duplicate-source and vocabulary limitations.
+- The action rationale names its supporting section in free text, but `RecommendedAction` does not yet carry a structured policy-reference field. Support was manually verifiable from the retained context but is not action-by-action machine-verifiable.
+- Passing Pydantic and citation-membership checks did not prevent policy nuance from being misstated. This validates the need for the later reviewer stage and visible human inspection.
+
+The manual test succeeded technically, but the above quality issues are intentionally retained in this record rather than treating schema validity as correctness.

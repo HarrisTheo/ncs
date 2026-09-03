@@ -34,6 +34,16 @@ class RetrievalResult:
     score: float
 
 
+@dataclass(frozen=True, slots=True)
+class PolicyDocumentResult:
+    """A relevant policy document with all sections retained for grounding."""
+
+    source: str
+    title: str
+    sections: tuple[PolicySection, ...]
+    score: float
+
+
 def load_policy_sections(policy_directory: str | Path) -> list[PolicySection]:
     """Load H2 sections from policy Markdown files in deterministic order.
 
@@ -79,21 +89,7 @@ def retrieve_policy_sections(
     searchable_text = [
         f"{section.title}\n{section.heading}\n{section.text}" for section in sections
     ]
-    vectorizer = TfidfVectorizer(
-        lowercase=True,
-        stop_words="english",
-        ngram_range=(1, 2),
-        sublinear_tf=True,
-    )
-
-    try:
-        section_vectors = vectorizer.fit_transform(searchable_text)
-    except ValueError:
-        # scikit-learn raises when the corpus has no usable vocabulary.
-        return []
-
-    query_vector = vectorizer.transform([query])
-    scores = cosine_similarity(query_vector, section_vectors).ravel()
+    scores = _tfidf_scores(query, searchable_text)
 
     ranked = sorted(
         zip(sections, scores, strict=True),
@@ -104,6 +100,70 @@ def retrieve_policy_sections(
         for section, score in ranked[:limit]
         if score > 0
     ]
+
+
+def retrieve_policy_documents(
+    incident_description: str,
+    policy_directory: str | Path,
+    *,
+    limit: int = 3,
+    min_relative_score: float = 0.25,
+) -> list[PolicyDocumentResult]:
+    """Rank complete policies and retain all sections from relevant documents.
+
+    Document ranking prevents several high-scoring sections from one policy
+    from hiding a second relevant policy. The relative floor avoids filling a
+    fixed result count with weakly related documents.
+    """
+
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    if not 0 <= min_relative_score <= 1:
+        raise ValueError("min_relative_score must be between 0 and 1")
+
+    query = incident_description.strip()
+    if not query:
+        return []
+
+    sections = load_policy_sections(policy_directory)
+    if not sections:
+        return []
+
+    grouped: dict[str, list[PolicySection]] = {}
+    for section in sections:
+        grouped.setdefault(section.source, []).append(section)
+
+    documents = [
+        (source, grouped[source][0].title, tuple(grouped[source]))
+        for source in sorted(grouped, key=str.casefold)
+    ]
+    searchable_text = [
+        "\n".join(
+            f"{section.title}\n{section.heading}\n{section.text}"
+            for section in document_sections
+        )
+        for _, _, document_sections in documents
+    ]
+    scores = _tfidf_scores(query, searchable_text)
+    ranked = sorted(
+        zip(documents, scores, strict=True),
+        key=lambda item: (-float(item[1]), item[0][0]),
+    )
+    top_score = float(ranked[0][1])
+    if top_score <= 0:
+        return []
+
+    score_floor = top_score * min_relative_score
+    return [
+        PolicyDocumentResult(
+            source=source,
+            title=title,
+            sections=document_sections,
+            score=float(score),
+        )
+        for (source, title, document_sections), score in ranked
+        if score >= score_floor
+    ][:limit]
 
 
 def _parse_policy(path: Path) -> list[PolicySection]:
@@ -162,3 +222,18 @@ def _append_section(
 def _slugify(value: str) -> str:
     slug = _SLUG_PATTERN.sub("-", value.casefold()).strip("-")
     return slug or "section"
+
+
+def _tfidf_scores(query: str, searchable_text: list[str]) -> list[float]:
+    vectorizer = TfidfVectorizer(
+        lowercase=True,
+        stop_words="english",
+        ngram_range=(1, 2),
+        sublinear_tf=True,
+    )
+    try:
+        vectors = vectorizer.fit_transform(searchable_text)
+    except ValueError:
+        return [0.0] * len(searchable_text)
+    query_vector = vectorizer.transform([query])
+    return [float(score) for score in cosine_similarity(query_vector, vectors).ravel()]

@@ -15,12 +15,12 @@ The triage prompt is responsible for:
 
 - Classifying the incident into one of the supported categories.
 - Selecting `low`, `medium`, `high`, or `critical` severity.
-- Expressing bounded confidence and lowering it when material facts are missing.
-- Extracting factual observations from the incident description.
+- Expressing categorical confidence and lowering it when material facts are missing.
+- Copying factual evidence exactly from the incident description.
 - Keeping inference out of the evidence collection.
 - Producing a short user-facing explanation that acknowledges uncertainty.
 - Citing only retrieved policy filenames and section identifiers.
-- Recommending actions only when the retrieved policies support them.
+- Selecting actions only as exact excerpts from retrieved policy action sections.
 - Marking every recommended action as requiring human approval.
 - Returning exactly the `IncidentAssessment` JSON structure.
 
@@ -77,21 +77,21 @@ If the reviewer identifies a problem, the application preserves both the assessm
 
 Both prompts repeat that only the supplied incident and retrieved passages may be used. This does not guarantee factual behavior, but it creates a clear criterion that deterministic checks and the reviewer can evaluate.
 
-### Exact source identifiers
+### Exact source identifiers and deterministic resolution
 
-The triage output must use the exact source filename and section identifier supplied by retrieval. The reviewer checks these references, and application code will later verify identifier membership deterministically. This is stronger than asking for informal policy names.
+The triage output must use the exact source filename and section identifier supplied by retrieval. Application code verifies identifier membership and resolves it back to the exact retrieved text. The model is deliberately not asked to reproduce policy quotations after tests showed it could join non-adjacent text into a fabricated composite quote.
 
 ### Evidence separated from explanation
 
-Evidence items are restricted to observations from the incident description. Interpretation belongs only in the short reasoning summary. This reduces the chance that a plausible inference becomes a fabricated fact.
+Evidence items must be exact contiguous excerpts of the incident description. Interpretation belongs only in the short reasoning summary. Application code rejects an evidence item that does not occur in the input.
 
 ### Explicit uncertainty
 
-The model is directed to lower confidence and acknowledge missing information rather than fill gaps. Confidence is bounded by the schema and is presented as a model estimate, not a calibrated probability.
+The model is directed to lower confidence and acknowledge missing information rather than fill gaps. Confidence uses `low`, `medium`, or `high`; these labels remain model judgments, but avoid false numeric precision.
 
 ### Policy-supported actions only
 
-Recommendations require a supplied policy basis. Every recommendation also requires human approval under the current MVP contract, which is simpler and safer than asking the model to classify action impact reliably.
+Recommendations must be copied from a cited policy action section, and application code verifies the excerpt. Every recommendation's approval value is constrained to literal `true`, which is simpler and safer than asking the model to classify action impact reliably.
 
 ### Structured output with forbidden extras
 
@@ -118,7 +118,7 @@ Combining both tasks into one prompt would ask the same generation to create and
 - A model may ignore closed-world instructions or produce schema-valid but misleading content.
 - The same model used twice can reproduce the same error in both stages.
 - Exact citation membership proves that a passage was retrieved, not that the model interpreted it correctly.
-- A confidence number is not calibrated unless later evaluation demonstrates calibration.
+- A categorical confidence label is still subjective unless later evaluation demonstrates useful consistency.
 - Prompt quality cannot compensate for missing or irrelevant retrieved context.
 
 These limitations are why deterministic validation, visible source passages, targeted evaluation, and human review remain necessary.

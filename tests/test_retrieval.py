@@ -2,7 +2,11 @@ from pathlib import Path
 
 import pytest
 
-from src.retrieval import load_policy_sections, retrieve_policy_sections
+from src.retrieval import (
+    load_policy_sections,
+    retrieve_policy_documents,
+    retrieve_policy_sections,
+)
 
 
 POLICY_DIRECTORY = Path(__file__).parents[1] / "data" / "policies"
@@ -60,9 +64,27 @@ def test_results_are_deterministic() -> None:
     assert first == second
 
 
+def test_document_retrieval_preserves_distinct_relevant_playbooks() -> None:
+    incident = (
+        "An administrator account logged in from an unusual location, MFA was reset, "
+        "and approximately 4,000 customer records were downloaded."
+    )
+
+    results = retrieve_policy_documents(incident, POLICY_DIRECTORY)
+
+    assert [result.source for result in results] == [
+        "authentication-security.md",
+        "data-exfiltration.md",
+        "account-compromise.md",
+    ]
+    assert all(result.sections for result in results)
+    assert all(result.score > 0 for result in results)
+
+
 def test_empty_policy_directory_returns_no_results(tmp_path: Path) -> None:
     assert load_policy_sections(tmp_path) == []
     assert retrieve_policy_sections("Suspicious login", tmp_path) == []
+    assert retrieve_policy_documents("Suspicious login", tmp_path) == []
 
 
 def test_missing_policy_directory_returns_no_results(tmp_path: Path) -> None:
@@ -74,8 +96,22 @@ def test_missing_policy_directory_returns_no_results(tmp_path: Path) -> None:
 
 def test_empty_incident_returns_no_results() -> None:
     assert retrieve_policy_sections("   ", POLICY_DIRECTORY) == []
+    assert retrieve_policy_documents("   ", POLICY_DIRECTORY) == []
 
 
 def test_non_positive_limit_is_rejected() -> None:
     with pytest.raises(ValueError, match="limit must be at least 1"):
         retrieve_policy_sections("Service outage", POLICY_DIRECTORY, limit=0)
+
+    with pytest.raises(ValueError, match="limit must be at least 1"):
+        retrieve_policy_documents("Service outage", POLICY_DIRECTORY, limit=0)
+
+
+@pytest.mark.parametrize("relative_score", [-0.1, 1.1])
+def test_invalid_relative_score_is_rejected(relative_score: float) -> None:
+    with pytest.raises(ValueError, match="min_relative_score"):
+        retrieve_policy_documents(
+            "Service outage",
+            POLICY_DIRECTORY,
+            min_relative_score=relative_score,
+        )

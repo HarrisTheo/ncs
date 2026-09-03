@@ -10,7 +10,7 @@ The application will recommend investigation or containment actions but will not
 
 ## Status
 
-The repository currently contains planning documents, the fictional policy corpus, a tested TF-IDF policy retrieval layer, structured Pydantic contracts, system prompts, and a tested local Ollama provider adapter. Triage orchestration, review orchestration, evaluation, and the Streamlit workflow have not been implemented yet.
+The repository currently contains planning documents, the fictional policy corpus, TF-IDF retrieval, Pydantic contracts, system prompts, a local Ollama adapter, and a tested command-line triage path. Reviewer orchestration, evaluation, and the Streamlit workflow have not been implemented yet.
 
 ## Intended stack
 
@@ -42,6 +42,17 @@ cp .env.example .env
 ```
 
 The example environment file selects `qwen3.5:9b` and a loopback-only Ollama endpoint. Until configuration loading and the application pipeline are implemented, the project is not expected to run end to end.
+
+## Manual triage
+
+With Ollama running and the virtual environment active:
+
+```bash
+export OLLAMA_MODEL=qwen3.5:9b
+python -m src.triage "Describe the incident here"
+```
+
+The command prints the ranked retrieval matches, every policy passage supplied to the model, and the validated `IncidentAssessment` as JSON. It fails visibly on invalid input, missing policy context, unavailable inference, malformed model output, or a fabricated structured policy reference.
 
 ## Repository layout
 
