@@ -150,3 +150,85 @@ Covered scenarios:
 - The index is rebuilt for each query. This is intentionally simple for five policies but would be inefficient for a much larger corpus or high query volume.
 - Retrieval does not assess policy freshness, authority, conflicts, or access permissions.
 - The tests demonstrate representative queries, not comprehensive vocabulary or adversarial retrieval coverage.
+
+## 2026-09-03 — Ollama integration preflight
+
+### Environment findings
+
+- The Ollama CLI is not installed or is not available on `PATH`.
+- The Ollama desktop application is not present in the standard Applications directory.
+- No Ollama Homebrew formula is installed.
+- No daemon responded at the configured loopback endpoint.
+- No local Ollama model manifests or model cache were found.
+- The Python Ollama client is not installed in the project virtual environment.
+
+### Decision
+
+- Local inference cannot be exercised without first installing Ollama and at least one model.
+- No Ollama software, Python client, or model was installed.
+- No model was selected because there are no installed candidates to inspect and model downloads require prior user approval.
+- Provider integration implementation and its unit tests were paused at the explicit pre-installation decision point. No inference call was attempted.
+
+## 2026-09-03 — Ollama installation and provider integration
+
+### Model selected
+
+- Model: `qwen3.5:9b`.
+- Installed size: approximately 6.6 GB.
+- Parameters: 9.7 billion.
+- Quantization: Q4_K_M.
+- Advertised maximum context: 262,144 tokens; the application adapter deliberately limits requests to 8,192 tokens.
+- Ollama capabilities reported by the local manifest: completion, vision, tools, and thinking. This project uses text completion only, supplies a JSON schema, disables thinking output, and gives the model no tools.
+
+### Why this model was selected
+
+- The 9B-class model is a reasonable quality and memory compromise for the 18 GB Apple Silicon development machine.
+- Its 6.6 GB Q4 quantization leaves materially more unified memory for macOS, Ollama runtime overhead, context state, and the Streamlit application than a 17 GB 27B model would.
+- It should provide more reliable instruction-following and structured synthesis than the smallest 2B or 4B options while remaining practical for local interactive use.
+- Ollama exposes JSON-schema constrained output for this model through the same local chat API used by the adapter.
+- The selected model is configurable rather than embedded in application logic. `OLLAMA_MODEL` in `.env.example` records the development default.
+
+### Expected local-model limitations
+
+- Q4 quantization trades some output quality for lower memory use.
+- The model can still hallucinate facts, misuse policy passages, or return schema-invalid data; Pydantic validation and visible sources remain necessary.
+- Confidence values are model estimates, not calibrated probabilities.
+- The 8,192-token application context is intentionally much smaller than the advertised maximum, so excessive policy or incident text must be rejected or truncated deterministically later.
+- First-request model loading and CPU/GPU contention may cause noticeable latency.
+- A reviewer using the same model can reproduce the triage model's errors and is not independent assurance.
+- The model has general learned knowledge that may be outdated or irrelevant; prompts restrict it to supplied incident and policy context, but this restriction is not guaranteed.
+- Vision, tool use, and thinking output are unused. The model has no credentials, remediation tools, or operational authority.
+
+### Local software changes
+
+- Installed Ollama 0.33.2 through Homebrew.
+- Started the Homebrew Ollama service. It was verified listening on loopback only at `127.0.0.1:11434`.
+- Pulled `qwen3.5:9b` through Ollama and verified its digest and local manifest.
+- Installed the Ollama Python client 0.6.2 in the ignored project virtual environment.
+- The Homebrew Ollama installation also installed its MLX, MLX-C, and Python 3.14 dependencies and upgraded several existing Homebrew libraries. The project remains on its isolated Python 3.12 virtual environment.
+- No real inference request was made during installation or unit testing.
+
+### Provider integration
+
+- `src/llm.py` now defines a small provider-neutral `StructuredLLM` protocol and one `OllamaLLM` implementation.
+- The model may be supplied directly or through `OLLAMA_MODEL`; an explicit value takes precedence.
+- The host may be supplied directly or through `OLLAMA_HOST`, but the MVP rejects non-loopback endpoints.
+- Ollama-specific construction, chat calls, options, and exceptions remain inside `src/llm.py`.
+- Requests are non-streaming, use temperature zero, cap context at 8,192 tokens by default, disable thinking output, and send the Pydantic JSON schema to Ollama.
+- The adapter has explicit configuration, unavailable-service/model, timeout, and malformed-response errors.
+- Malformed-response exceptions do not echo raw model output, avoiding accidental leakage into logs or UI errors.
+- There is no automatic retry, model download, provider registry, or inference orchestration.
+
+### Files changed
+
+- `src/llm.py`
+- `tests/test_llm.py`
+- `.env.example`
+- `README.md`
+- `planning/04_agent_journal.md`
+
+### Tests executed
+
+- Provider unit suite: **27 passed**. These tests use a mock client and make no inference or network calls.
+- Full project suite before final documentation verification: **62 passed**.
+- Covered model configuration, precedence, loopback enforcement, client construction, deterministic request options, schema passing, connection failure, provider failure, timeout, missing response content, malformed JSON, Pydantic mismatch, non-echoing errors, and the replaceable protocol surface.
