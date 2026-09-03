@@ -88,3 +88,65 @@ Environment details are recorded descriptively. Project configuration contains n
 - No policy action is executable by the copilot.
 - File names and headings are designed to support deterministic passage identifiers and citations later; explicit citation IDs were not added to keep the documents readable.
 - No LLM, retrieval logic, or application behavior was implemented in this step.
+
+## 2026-09-03 — Policy retrieval layer
+
+### Files changed
+
+- `src/retrieval.py`: implemented Markdown section loading and TF-IDF/cosine ranking.
+- `tests/test_retrieval.py`: added retrieval and edge-case unit tests.
+- `README.md`: updated implementation status.
+- `planning/04_agent_journal.md`: recorded this implementation step.
+
+### Implementation decisions
+
+- Retrieval is independent of prompts, Ollama, triage, and reviewer code.
+- The loader reads `.md` files from the supplied directory in case-insensitive filename order and intentionally excludes `README.md`.
+- Policies are split on level-two Markdown headings. Preamble metadata is not indexed.
+- Stable section identifiers are generated from the source filename and heading. Duplicate heading slugs receive deterministic numeric suffixes.
+- Search text combines the policy title, section heading, and section body.
+- Ranking uses scikit-learn TF-IDF with English stop words, unigrams and bigrams, sublinear term frequency, and cosine similarity.
+- The small corpus is indexed in memory for each retrieval call. This avoids an index abstraction or persistence mechanism; the cost is negligible for five short documents.
+- Results are ordered by descending raw score with source filename and section identifier as deterministic tie-breakers.
+- The default result limit is three. Zero-score sections are omitted rather than presented as relevant.
+- Empty input, a missing directory, an empty directory, or a corpus with no usable vocabulary safely returns no results. A non-positive result limit is rejected.
+- Results use small frozen dataclasses containing the complete section, source filename, stable identifier, and cosine-similarity score.
+- No LLM, prompt, triage, reviewer, UI, embedding, or vector-database behavior was added.
+
+### Test environment
+
+- Created the ignored local `.venv` with the already available Python 3.12.12 interpreter.
+- Installed only the dependencies needed for this layer's tests: scikit-learn 1.9.0 and pytest 9.1.1, plus their transitive dependencies.
+- No Ollama software or model was installed.
+
+### Tests executed
+
+Command:
+
+```text
+.venv/bin/python -m pytest tests/test_retrieval.py -v
+```
+
+Result: **10 passed in 21.55 seconds**.
+
+Covered scenarios:
+
+- Suspicious privileged login and MFA reset retrieves `authentication-security.md` first.
+- Large customer-record download retrieves `data-exfiltration.md` first.
+- Malware execution and command-and-control activity retrieves `malware-response.md` first.
+- Customer-facing outage symptoms retrieve `service-outage.md` first.
+- Stable unique identifiers and exclusion of the corpus README.
+- Repeatable deterministic results.
+- Empty, missing, and invalid-input edge cases.
+
+### Known limitations
+
+- TF-IDF is lexical. It can miss relevant policies when the incident uses terminology absent from the corpus, even if the meaning is similar.
+- English stop words and word-based tokenization make the current configuration unsuitable for multilingual incidents without adjustment.
+- Each heading is ranked independently, so evidence spread across several sections may receive lower scores and document-level context is not combined.
+- Similarity values are relative to this small corpus and are not calibrated probabilities or confidence scores.
+- Apart from excluding exact zero scores, there is no tuned relevance threshold. A weak non-zero match may still appear in the top three.
+- The parser expects meaningful content under level-two headings and does not implement full Markdown semantics.
+- The index is rebuilt for each query. This is intentionally simple for five policies but would be inefficient for a much larger corpus or high query volume.
+- Retrieval does not assess policy freshness, authority, conflicts, or access permissions.
+- The tests demonstrate representative queries, not comprehensive vocabulary or adversarial retrieval coverage.
