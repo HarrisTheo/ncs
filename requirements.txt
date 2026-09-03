@@ -1,0 +1,5 @@
+streamlit>=1.40,<2
+pydantic>=2.9,<3
+ollama>=0.4,<1
+scikit-learn>=1.5,<2
+pytest>=8,<10
